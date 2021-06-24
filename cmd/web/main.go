@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"os"
 )
 
 type Config struct {
@@ -22,6 +23,11 @@ func main() {
 	flag.StringVar(&cfg.StaticDir, "staticDir", "./ui/static", "path to static resources")
 	flag.Parse()
 
+	// creating loggers
+	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+	errorLog := log.New(os.Stderr,"ERROR\t",log.Ldate|log.Ltime|log.Lshortfile)
+
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", home)
@@ -32,7 +38,16 @@ func main() {
 
 	mux.Handle("/static/", http.StripPrefix("/static", fileserver))
 
-	log.Printf("starting server on port %s ", cfg.Addr)
-	err := http.ListenAndServe(cfg.Addr, mux)
-	log.Fatal(err)
+	// custom http.Server struct. Telling to use http address from cmd line flag
+	// use custom error log and use the handler defined above. 
+	// Rest all values of http.server struct will be set to default as per Go library.
+	srv := &http.Server{
+		Addr: cfg.Addr,
+		ErrorLog: errorLog,
+		Handler: mux,
+	}
+
+	infoLog.Printf("starting server on port %s ", cfg.Addr)
+	err := srv.ListenAndServe()
+	errorLog.Fatal(err)
 }
