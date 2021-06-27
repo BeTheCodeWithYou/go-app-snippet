@@ -5,12 +5,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"neerajsidhaye.com/snippetbox/config"
 )
 
-type Config struct {
+type application struct {
 
-	Addr string
-	StaticDir string
+	ErrorLog *log.Logger
+	InfoLog *log.Logger
 }
 
 func main() {
@@ -18,23 +19,34 @@ func main() {
 	// directly passing value from command line without having config struct.
 	// addr := flag.String("addr", ":3000", "http server port")
 	
-	cfg := new(Config)
-	flag.StringVar(&cfg.Addr, "addr", ":4040", "Http Server Port")
-	flag.StringVar(&cfg.StaticDir, "staticDir", "./ui/static", "path to static resources")
+	cmdline := new(config.Cmdline)
+	flag.StringVar(&cmdline.Addr, "addr", ":4040", "Http Server Port")
+	flag.StringVar(&cmdline.StaticDir, "staticDir", "./ui/static", "path to static resources")
 	flag.Parse()
 
 	// creating loggers
-	infoLog := log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
+	f, err := os.OpenFile("./tmp/info.log", os.O_RDWR|os.O_CREATE, 0666)
+	if err!=nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	infoLog := log.New(f, "INFO\t", log.Ldate|log.Ltime)
 	errorLog := log.New(os.Stderr,"ERROR\t",log.Ldate|log.Ltime|log.Lshortfile)
 
+	//initialize application struct
+	app := &application{
+		ErrorLog: errorLog,
+		InfoLog: infoLog,
+	}
 
 	mux := http.NewServeMux()
+	
+	mux.HandleFunc("/", app.home)
+	mux.HandleFunc("/snippet", app.showSnippet)
+	mux.HandleFunc("/snippet/create", app.createSnippet)
 
-	mux.HandleFunc("/", home)
-	mux.HandleFunc("/snippet", showSnippet)
-	mux.HandleFunc("/snippet/create", createSnippet)
-
-	fileserver := http.FileServer(http.Dir(cfg.StaticDir))
+	fileserver := http.FileServer(http.Dir(cmdline.StaticDir))
 
 	mux.Handle("/static/", http.StripPrefix("/static", fileserver))
 
@@ -42,12 +54,12 @@ func main() {
 	// use custom error log and use the handler defined above. 
 	// Rest all values of http.server struct will be set to default as per Go library.
 	srv := &http.Server{
-		Addr: cfg.Addr,
+		Addr: cmdline.Addr,
 		ErrorLog: errorLog,
 		Handler: mux,
 	}
 
-	infoLog.Printf("starting server on port %s ", cfg.Addr)
-	err := srv.ListenAndServe()
+	infoLog.Printf("starting server on port %s ", cmdline.Addr)
+	err = srv.ListenAndServe()
 	errorLog.Fatal(err)
 }
