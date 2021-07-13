@@ -40,23 +40,13 @@ func main() {
 		InfoLog: infoLog,
 	}
 
-	mux := http.NewServeMux()
-	
-	mux.HandleFunc("/", app.home)
-	mux.HandleFunc("/snippet", app.showSnippet)
-	mux.HandleFunc("/snippet/create", app.createSnippet)
-
-	fileserver := http.FileServer(http.Dir(cmdline.StaticDir))
-
-	mux.Handle("/static/", http.StripPrefix("/static", fileserver))
-
 	// custom http.Server struct. Telling to use http address from cmd line flag
 	// use custom error log and use the handler defined above. 
 	// Rest all values of http.server struct will be set to default as per Go library.
 	srv := &http.Server{
 		Addr: cmdline.Addr,
 		ErrorLog: errorLog,
-		Handler: mux,
+		Handler: app.routes(),
 	}
 
 	infoLog.Printf("starting server on port %s ", cmdline.Addr)
